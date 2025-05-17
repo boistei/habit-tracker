@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Habit Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: false };
+  </script>
+</head>
+<body class="bg-gray-100 text-gray-900 min-h-screen flex flex-col items-center p-4 transition-colors duration-300">
+
+  <div class="w-full max-w-md">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-2xl font-bold">Habit Tracker</h1>
+      <!-- Removed the toggle dark mode button -->
+    </div>
+
+    <div class="flex justify-end mb-4 space-x-2">
+      <a href="summary.html" class="text-sm border px-3 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition">Summary</a>
+      <a href="manage.html" class="text-sm border px-3 py-1 rounded bg-purple-500 text-white hover:bg-purple-600 transition">Manage</a>
+    </div>
+
+    <div class="flex flex-col items-center mb-4">
+      <div class="flex items-center space-x-4 mb-2 relative">
+        <button id="prev-date" class="px-2 py-1 bg-gray-200 rounded">⬅️</button>
+        <span id="current-date" class="font-semibold text-lg cursor-pointer underline"></span>
+        <input type="date" id="date-picker" class="absolute opacity-0 w-0 h-0 pointer-events-none" max="" />
+        <button id="next-date" class="px-2 py-1 bg-gray-200 rounded" disabled>➡️</button>
+      </div>
+      <div class="text-sm text-gray-600">
+        <span id="day-of-year"></span> • <span id="week-number"></span>
+      </div>
+    </div>
+
+    <div id="habit-list" class="space-y-4"></div>
+  </div>
+
+  <script>
+    // Load and save habits from localStorage
+    function loadHabits() {
+      const stored = localStorage.getItem("habitList");
+      return stored ? JSON.parse(stored) : [];
+    }
+    function saveHabits(habits) {
+      localStorage.setItem("habitList", JSON.stringify(habits));
+    }
+
+    // Save and get status for a habit on a date, key format: frequency-yyyy-mm-dd
+    function getStatusKey(frequency, dateStr) {
+      return `${frequency}-${dateStr}`;
+    }
+    function loadStatus(frequency, dateStr) {
+      const data = localStorage.getItem(getStatusKey(frequency, dateStr));
+      return data ? JSON.parse(data) : {};
+    }
+    function saveStatus(frequency, dateStr, status) {
+      localStorage.setItem(getStatusKey(frequency, dateStr), JSON.stringify(status));
+    }
+
+    // Date utils
+    function formatDate(date) {
+      return date.toISOString().split('T')[0];
+    }
+    function getDayOfYear(date) {
+      const start = new Date(date.getFullYear(), 0, 0);
+      const diff = date - start;
+      return Math.floor(diff / (1000 * 60 * 60 * 24));
+    }
+    function getWeekNumber(date) {
+      const dayOfYear = getDayOfYear(date);
+      return Math.ceil(dayOfYear / 7);
+    }
+
+    let selectedDate = new Date();
+    const dateEl = document.getElementById("current-date");
+    const datePicker = document.getElementById("date-picker");
+    const dayOfYearEl = document.getElementById("day-of-year");
+    const weekNumberEl = document.getElementById("week-number");
+    const habitListEl = document.getElementById("habit-list");
+
+    function updateDateUI() {
+      const today = new Date();
+      dateEl.textContent = formatDate(selectedDate);
+      datePicker.value = formatDate(selectedDate);
+
+      // Disable next button if selectedDate is today or in future
+      document.getElementById("next-date").disabled = (formatDate(selectedDate) >= formatDate(today));
+
+      dayOfYearEl.textContent = `Day ${getDayOfYear(selectedDate)}`;
+      weekNumberEl.textContent = `Week ${getWeekNumber(selectedDate)}`;
+    }
+
+    function renderHabits() {
+      habitListEl.innerHTML = '';
+      const habits = loadHabits();
+
+      ['daily', 'weekly', 'monthly'].forEach(freq => {
+        const groupHabits = habits.filter(h => h.frequency === freq);
+        if (groupHabits.length === 0) return;
+
+        const header = document.createElement('h2');
+        header.className = "text-xl font-semibold mt-6 mb-2";
+        header.textContent = freq.charAt(0).toUpperCase() + freq.slice(1) + " Habits";
+        habitListEl.appendChild(header);
+
+        const dateStr = formatDate(selectedDate);
+        const statusObj = loadStatus(freq, dateStr);
+
+        groupHabits.forEach(habit => {
+          const isDone = statusObj[habit.name] === "Yes";
+
+          const habitDiv = document.createElement('div');
+          habitDiv.className = 
+            `cursor-pointer select-none p-4 rounded shadow flex justify-between items-center transition-colors duration-200 ` + 
+            (isDone ? "bg-green-600 text-white" : "bg-gray-200 text-gray-900");
+
+          const nameSpan = document.createElement('span');
+          nameSpan.textContent = habit.name;
+          nameSpan.className = "font-medium";
+
+          const statusSpan = document.createElement('span');
+          statusSpan.textContent = isDone ? "✅ Yes" : "❌ No";
+
+          habitDiv.appendChild(nameSpan);
+          habitDiv.appendChild(statusSpan);
+
+          habitDiv.onclick = () => {
+            statusObj[habit.name] = isDone ? "No" : "Yes";
+            saveStatus(freq, dateStr, statusObj);
+            renderHabits();
+          };
+
+          habitListEl.appendChild(habitDiv);
+        });
+      });
+    }
+
+    function renderAll() {
+      updateDateUI();
+      renderHabits();
+    }
+
+    document.getElementById("prev-date").onclick = () => {
+      selectedDate.setDate(selectedDate.getDate() - 1);
+      renderAll();
+    };
+
+    document.getElementById("next-date").onclick = () => {
+      selectedDate.setDate(selectedDate.getDate() + 1);
+      renderAll();
+    };
+
+    dateEl.onclick = () => datePicker.click();
+    datePicker.onchange = () => {
+      selectedDate = new Date(datePicker.value);
+      renderAll();
+    };
+
+    renderAll();
+  </script>
+</body>
+</html>

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Habit Summary - Calendar View</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-900 min-h-screen flex flex-col items-center p-6">
+  <div class="w-full max-w-5xl">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl font-bold">Habit Summary - Calendar View</h1>
+      <a href="index.html" class="text-sm border px-3 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition">Back</a>
+    </div>
+
+    <div id="summary-container" class="space-y-12"></div>
+  </div>
+
+  <script>
+    function loadHabits() {
+      const stored = localStorage.getItem("habitList");
+      return stored ? JSON.parse(stored) : [];
+    }
+  
+    function loadStatus(frequency, dateStr) {
+      const data = localStorage.getItem(frequency + '-' + dateStr);
+      return data ? JSON.parse(data) : {};
+    }
+  
+    function formatDate(date) {
+      return date.toISOString().split('T')[0];
+    }
+  
+    // Helper: get days count per month in dateLabels
+    function groupByMonth(dateLabels) {
+      const groups = [];
+      let currentMonth = null;
+      let currentGroup = null;
+  
+      dateLabels.forEach(dateStr => {
+        const date = new Date(dateStr);
+        const monthYear = date.getFullYear() + '-' + date.getMonth();
+  
+        if (monthYear !== currentMonth) {
+          if (currentGroup) groups.push(currentGroup);
+          currentMonth = monthYear;
+          currentGroup = {
+            month: date.toLocaleString('default', { month: 'short', year: 'numeric' }),
+            count: 1,
+          };
+        } else {
+          currentGroup.count++;
+        }
+      });
+      if (currentGroup) groups.push(currentGroup);
+      return groups;
+    }
+  
+    function renderCalendarSection(freq, habits) {
+      const now = new Date();
+      const container = document.createElement('section');
+      container.className = "bg-white rounded p-6 shadow";
+  
+      const heading = document.createElement('h2');
+      heading.className = "text-xl font-semibold mb-4";
+      heading.textContent = freq.charAt(0).toUpperCase() + freq.slice(1) + 
+        " Habits (last " + (freq === "daily" ? "30 days" : freq === "weekly" ? "12 weeks" : "12 months") + ")";
+      container.appendChild(heading);
+  
+      let dateLabels = [];
+      if (freq === "daily") {
+        for (let i = 29; i >= 0; i--) {
+          let d = new Date(now);
+          d.setDate(now.getDate() - i);
+          dateLabels.push(formatDate(d));
+        }
+      } else if (freq === "weekly") {
+        for (let i = 11; i >= 0; i--) {
+          let d = new Date(now);
+          d.setDate(now.getDate() - i * 7);
+          dateLabels.push(formatDate(d));
+        }
+      } else if (freq === "monthly") {
+        for (let i = 11; i >= 0; i--) {
+          let d = new Date(now);
+          d.setMonth(now.getMonth() - i);
+          dateLabels.push(formatDate(d));
+        }
+      }
+  
+      // Container grid for headers + habit rows:
+      const gridWrapper = document.createElement('div');
+      gridWrapper.style.display = 'grid';
+  
+      if (freq === "daily") {
+        // 1 column for habit names + columns for days
+        gridWrapper.style.gridTemplateColumns = `150px repeat(${dateLabels.length}, minmax(0, 1fr))`;
+        gridWrapper.style.gap = '0.25rem';
+  
+        // --- MONTH HEADER ROW ---
+        const monthGroups = groupByMonth(dateLabels);
+        const monthHeader = document.createElement('div');
+        monthHeader.style.display = 'contents'; // allow children to span grid columns
+  
+        monthGroups.forEach(group => {
+          const monthCell = document.createElement('div');
+          monthCell.textContent = group.month;
+          monthCell.style.gridColumn = `span ${group.count}`;
+          monthCell.className = 'text-center font-semibold border-b pb-1';
+          monthCell.style.userSelect = 'none';
+          monthHeader.appendChild(monthCell);
+        });
+        // Add empty cell at start for habit name column (spans 1 col)
+        const emptyMonthCell = document.createElement('div');
+        emptyMonthCell.style.gridColumn = '1';
+        monthHeader.insertBefore(emptyMonthCell, monthHeader.firstChild);
+  
+        gridWrapper.appendChild(monthHeader);
+  
+        // --- DAY NUMBER ROW ---
+        const dayHeader = document.createElement('div');
+        dayHeader.style.display = 'contents';
+  
+        // Empty cell for habit name column
+        const emptyDayCell = document.createElement('div');
+        emptyDayCell.style.gridColumn = '1';
+        dayHeader.appendChild(emptyDayCell);
+  
+        dateLabels.forEach(dateStr => {
+          const date = new Date(dateStr);
+          const dayNum = date.getDate();
+          const dayCell = document.createElement('div');
+          dayCell.textContent = dayNum;
+          dayCell.className = 'text-center text-xs font-mono border-b pb-1 select-none';
+          dayHeader.appendChild(dayCell);
+        });
+  
+        gridWrapper.appendChild(dayHeader);
+  
+        // --- HABIT ROWS ---
+        habits.forEach(habit => {
+          // Habit name cell
+          const habitNameCell = document.createElement('div');
+          habitNameCell.textContent = habit.name;
+          habitNameCell.className = 'font-semibold select-none truncate';
+          habitNameCell.style.whiteSpace = 'nowrap';
+          habitNameCell.style.paddingRight = '0.5rem';
+          gridWrapper.appendChild(habitNameCell);
+  
+          // Status cells
+          dateLabels.forEach(dateStr => {
+            const statusObj = loadStatus(freq, dateStr);
+            const completed = statusObj[habit.name] === "Yes";
+            const cell = document.createElement('div');
+            cell.className = "w-6 h-6 flex items-center justify-center rounded cursor-default select-none";
+            if (completed) {
+              cell.classList.add("bg-green-500", "text-white");
+              cell.textContent = "✓";
+              cell.title = `Completed on ${dateStr}`;
+            } else {
+              cell.classList.add("bg-gray-300");
+              cell.title = `Not completed on ${dateStr}`;
+            }
+            gridWrapper.appendChild(cell);
+          });
+        });
+  
+      } else {
+        // For weekly and monthly frequencies fallback to simpler single header row for now
+        gridWrapper.style.gridTemplateColumns = `150px repeat(${dateLabels.length}, minmax(0, 1fr))`;
+        gridWrapper.style.gap = '0.25rem';
+  
+        // Simple header row with dates
+        const headerRow = document.createElement('div');
+        headerRow.style.display = 'contents';
+  
+        const emptyCell = document.createElement('div');
+        emptyCell.style.gridColumn = '1';
+        headerRow.appendChild(emptyCell);
+  
+        dateLabels.forEach(dateStr => {
+          const cell = document.createElement('div');
+          cell.className = "text-center text-xs font-mono border-b pb-1 select-none";
+          cell.textContent = freq === "weekly" 
+            ? "Wk " + getWeekNumber(new Date(dateStr)) 
+            : new Date(dateStr).toLocaleString('default', {month: 'short', year: '2-digit'});
+          headerRow.appendChild(cell);
+        });
+        gridWrapper.appendChild(headerRow);
+  
+        // Habit rows
+        habits.forEach(habit => {
+          const habitNameCell = document.createElement('div');
+          habitNameCell.textContent = habit.name;
+          habitNameCell.className = 'font-semibold select-none truncate';
+          habitNameCell.style.whiteSpace = 'nowrap';
+          habitNameCell.style.paddingRight = '0.5rem';
+          gridWrapper.appendChild(habitNameCell);
+  
+          dateLabels.forEach(dateStr => {
+            const statusObj = loadStatus(freq, dateStr);
+            const completed = statusObj[habit.name] === "Yes";
+            const cell = document.createElement('div');
+            cell.className = "w-6 h-6 flex items-center justify-center rounded cursor-default select-none";
+            if (completed) {
+              cell.classList.add("bg-green-500", "text-white");
+              cell.textContent = "✓";
+              cell.title = `Completed on ${dateStr}`;
+            } else {
+              cell.classList.add("bg-gray-300");
+              cell.title = `Not completed on ${dateStr}`;
+            }
+            gridWrapper.appendChild(cell);
+          });
+        });
+      }
+  
+      container.appendChild(gridWrapper);
+      return container;
+    }
+  
+    function getWeekNumber(d) {
+      const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      const dayNum = date.getUTCDay() || 7;
+      date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+      return Math.ceil((((date - yearStart) / 86400000) + 1)/7);
+    }
+  
+    function renderSummary() {
+      const container = document.getElementById("summary-container");
+      container.innerHTML = '';
+  
+      ['daily', 'weekly', 'monthly'].forEach(freq => {
+        const habits = loadHabits().filter(h => h.frequency === freq);
+        if (habits.length === 0) return;
+  
+        const calendarSection = renderCalendarSection(freq, habits);
+        container.appendChild(calendarSection);
+      });
+    }
+  
+    renderSummary();
+  </script>
+  
+  
+</body>
+</html>

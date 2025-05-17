@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Manage Habits</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-900 min-h-screen flex flex-col items-center p-6">
+  <div class="w-full max-w-xl">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl font-bold">Manage Habits</h1>
+      <a href="index.html" class="text-sm border px-3 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition">Back</a>
+    </div>
+
+    <form id="add-form" class="mb-6 flex space-x-2">
+      <input type="text" id="new-habit" placeholder="Habit name" class="flex-1 px-3 py-2 rounded border" required />
+      <select id="frequency" class="px-3 py-2 rounded border">
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+      </select>
+      <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add</button>
+    </form>
+
+    <div id="habit-container" class="space-y-4"></div>
+  </div>
+
+  <script>
+    function loadHabits() {
+      const stored = localStorage.getItem("habitList");
+      return stored ? JSON.parse(stored) : [];
+    }
+
+    function saveHabits(habits) {
+      localStorage.setItem("habitList", JSON.stringify(habits));
+    }
+
+    function renderHabits() {
+      const container = document.getElementById("habit-container");
+      const habits = loadHabits();
+      container.innerHTML = '';
+
+      habits.forEach((habit, index) => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "p-4 bg-white rounded shadow flex justify-between items-center";
+
+        const left = document.createElement("div");
+        left.className = "flex items-center space-x-4";
+
+        const nameInput = document.createElement("input");
+        nameInput.value = habit.name;
+        nameInput.className = "bg-transparent border-b border-gray-400 focus:outline-none";
+        nameInput.onchange = () => {
+          habits[index].name = nameInput.value.trim();
+          saveHabits(habits);
+          renderHabits(); // Re-render to keep UI consistent
+        };
+
+        const freqSelect = document.createElement("select");
+        ['daily', 'weekly', 'monthly'].forEach(f => {
+          const opt = document.createElement("option");
+          opt.value = f;
+          opt.textContent = f.charAt(0).toUpperCase() + f.slice(1);
+          if (habit.frequency === f) opt.selected = true;
+          freqSelect.appendChild(opt);
+        });
+        freqSelect.className = "bg-transparent";
+        freqSelect.onchange = () => {
+          habits[index].frequency = freqSelect.value;
+          saveHabits(habits);
+          renderHabits();
+        };
+
+        left.appendChild(nameInput);
+        left.appendChild(freqSelect);
+
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "🗑️";
+        delBtn.className = "text-red-500 hover:text-red-700";
+        delBtn.onclick = () => {
+          if(confirm(`Delete habit "${habit.name}"? This cannot be undone.`)) {
+            habits.splice(index, 1);
+            saveHabits(habits);
+            renderHabits();
+          }
+        };
+
+        wrapper.appendChild(left);
+        wrapper.appendChild(delBtn);
+        container.appendChild(wrapper);
+      });
+    }
+
+    document.getElementById("add-form").addEventListener("submit", e => {
+      e.preventDefault();
+      const name = document.getElementById("new-habit").value.trim();
+      const freq = document.getElementById("frequency").value;
+      if (!name) return;
+
+      const habits = loadHabits();
+      // Avoid duplicates by name
+      if (habits.some(h => h.name.toLowerCase() === name.toLowerCase())) {
+        alert("Habit with this name already exists.");
+        return;
+      }
+      habits.push({ name, frequency: freq });
+      saveHabits(habits);
+      e.target.reset();
+      renderHabits();
+    });
+
+    // Removed dark mode theme handling code
+
+    renderHabits();
+  </script>
+</body>
+</html>
