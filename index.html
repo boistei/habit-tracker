@@ -48,16 +48,38 @@
     }
 
     // Save and get status for a habit on a date, key format: frequency-yyyy-mm-dd
-    function getStatusKey(frequency, dateStr) {
-      return `${frequency}-${dateStr}`;
-    }
-    function loadStatus(frequency, dateStr) {
-      const data = localStorage.getItem(getStatusKey(frequency, dateStr));
-      return data ? JSON.parse(data) : {};
-    }
-    function saveStatus(frequency, dateStr, status) {
-      localStorage.setItem(getStatusKey(frequency, dateStr), JSON.stringify(status));
-    }
+    // Returns the correct key depending on frequency
+function getStatusKey(frequency, date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  if (frequency === 'daily') {
+    return `${frequency}-${year}-${month}-${day}`;
+  }
+
+  if (frequency === 'weekly') {
+    const week = String(getWeekNumber(date)).padStart(2, '0');
+    return `${frequency}-${year}-W${week}`;
+  }
+
+  if (frequency === 'monthly') {
+    return `${frequency}-${year}-${month}`;
+  }
+
+  return '';
+}
+
+function loadStatus(frequency, date) {
+  const key = getStatusKey(frequency, date);
+  const data = localStorage.getItem(key);
+  return data ? JSON.parse(data) : {};
+}
+
+function saveStatus(frequency, date, status) {
+  const key = getStatusKey(frequency, date);
+  localStorage.setItem(key, JSON.stringify(status));
+}
 
     // Date utils
     function formatDate(date) {
@@ -105,8 +127,7 @@
         header.textContent = freq.charAt(0).toUpperCase() + freq.slice(1) + " Habits";
         habitListEl.appendChild(header);
 
-        const dateStr = formatDate(selectedDate);
-        const statusObj = loadStatus(freq, dateStr);
+        const statusObj = loadStatus(freq, selectedDate);
 
         groupHabits.forEach(habit => {
           const isDone = statusObj[habit.name] === "Yes";
@@ -128,7 +149,7 @@
 
           habitDiv.onclick = () => {
             statusObj[habit.name] = isDone ? "No" : "Yes";
-            saveStatus(freq, dateStr, statusObj);
+            saveStatus(freq, selectedDate, statusObj);
             renderHabits();
           };
 
